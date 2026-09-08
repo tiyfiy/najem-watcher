@@ -141,11 +141,16 @@ Servis se sam ponovno zažene ob padcu in ob ponovnem zagonu strežnika.
 podvojenih obvestil. Če hočeš namerno začeti znova, ustavi servis in zbriši
 `data/seen.json`.
 
-Posodobitev kode:
+Posodobitev kode (git teče kot `root`, ker deploy ključ leži v `/root/.ssh`;
+`najem` ga ne more brati):
 
 ```bash
-cd /opt/najem-watcher && sudo -u najem git pull && sudo -u najem npm ci \
-  && sudo -u najem npm run build && sudo systemctl restart najem-watcher
+cd /opt/najem-watcher \
+  && sudo git pull \
+  && sudo chown -R najem:najem /opt/najem-watcher \
+  && sudo -u najem npm ci \
+  && sudo -u najem npm run build \
+  && sudo systemctl restart najem-watcher
 ```
 
 ## 6. Facebook (neobvezno, na lastno odgovornost)
