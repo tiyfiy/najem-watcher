@@ -90,29 +90,40 @@ z nižjo prioriteto.
 
 ## 5. Deploy na Hetzner
 
-Na svežem Ubuntu 24.04:
+> **Pozor — nepremicnine.net s podatkovnega centra ne dela.** Cloudflare vrne
+> 403 vsem IP-jem Hetznerja (preverjeno: tudi pravi Chromium in Cloudflare WARP
+> dobita `Attention Required` oz. neskončni `Trenutek...`). Z domačega
+> (rezidenčnega) IP-ja isti program deluje. Na VPS zato zanesljivo delujeta
+> samo bolha.com in mkvadrat.si; za nepremicnine.net glej razdelek 9.
+
+Na Ubuntu 24.04 ali 26.04 (26.04 ima Node 22 že v svojih paketih):
 
 ```bash
-# Node 22
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs git
+sudo apt update && sudo apt install -y nodejs npm git
+node -v    # >= 20
 
-# uporabnik in koda
+# koda: kloniraj PRED ustvarjanjem uporabnika (adduser --system ustvari domači
+# imenik, git clone pa zavrne nepraznega)
+sudo git clone git@github.com:<ti>/najem-watcher.git /opt/najem-watcher
 sudo adduser --system --group --home /opt/najem-watcher najem
-sudo -u najem git clone <tvoj-repo> /opt/najem-watcher
+sudo chown -R najem:najem /opt/najem-watcher
 cd /opt/najem-watcher
 sudo -u najem npm ci
 sudo -u najem npm run build
 sudo -u najem mkdir -p data
 
-# Chromium + sistemske knjižnice zanj (nepremicnine.net in bolha.com)
+# Chromium + sistemske knjižnice zanj
 sudo PLAYWRIGHT_BROWSERS_PATH=/opt/najem-watcher/.cache/ms-playwright \
   npx playwright install --with-deps chromium
 sudo chown -R najem:najem /opt/najem-watcher/.cache
 
 # nastavitve
 sudo -u najem cp .env.example .env && sudo -u najem nano .env
-sudo -u najem env $(grep -v '^#' .env | xargs) node dist/tools/test-notify.js   # test na telefon
+sudo chmod 600 .env
+
+# test na telefon (program sam prebere .env iz delovnega imenika)
+sudo -u najem env PLAYWRIGHT_BROWSERS_PATH=/opt/najem-watcher/.cache/ms-playwright \
+  node dist/tools/test-notify.js
 
 # servis
 sudo cp deploy/najem-watcher.service /etc/systemd/system/
@@ -120,6 +131,10 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now najem-watcher
 journalctl -u najem-watcher -f
 ```
+
+Ne poskušaj spremenljivk podajati z `env $(grep -v '^#' .env | xargs)` —
+`EXCLUDE` in `BOOST` vsebujeta presledke in ukaz razpade. Program `.env`
+prebere sam (dotenv), systemd pa prek `EnvironmentFile=`.
 
 Servis se sam ponovno zažene ob padcu in ob ponovnem zagonu strežnika.
 `data/seen.json` preživi restart, tako da po ponovnem zagonu ne dobiš
@@ -181,3 +196,25 @@ data/seen.json      spomin na že videne oglase
 Nov vir dodaš tako, da napišeš datoteko v `src/sources/`, ki vrne
 `Listing[]`, in jo registriraš v `src/sources/index.ts`. Vse ostalo
 (dedup, filtriranje, obveščanje) dobiš zastonj.
+
+## 9. nepremicnine.net s strežnika (Cloudflare blok)
+
+Preverjeno stanje, september 2026:
+
+| od kod | nepremicnine.net | bolha.com | mkvadrat.si |
+| --- | --- | --- | --- |
+| domači/rezidenčni IP | deluje (25 oglasov/stran) | deluje | deluje |
+| Hetzner CX22 (DE) | **403 Cloudflare** | deluje (10) | deluje (23) |
+| Hetzner + Cloudflare WARP | **neskončni "Trenutek..."** | — | — |
+
+Blokada visi na ugledu IP-ja, ne na brskalniku: isti headless Chromium z
+domačega omrežja stran normalno prebere. Menjava User-Agenta, polni Chromium
+namesto headless-shella in WARP proxy ne pomagajo.
+
+Možnosti, od najcenejše navzgor:
+
+1. **Teči doma** (prenosnik, Raspberry Pi, NAS) — vsi trije viri delujejo,
+    zastonj, naprava mora biti prižgana.
+2. **Rezidenčni/mobilni proxy samo za nepremicnine.net** — nekaj €/mesec.
+3. **Samo bolha.com + mkvadrat.si na VPS**, nepremicnine.net pa prek njihovih
+    lastnih shranjenih iskanj (brezplačen račun → obveščanje o novih oglasih).
