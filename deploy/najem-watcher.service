@@ -1,0 +1,28 @@
+[Unit]
+Description=Najem watcher (Ljubljana rental alerts)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=najem
+WorkingDirectory=/opt/najem-watcher
+EnvironmentFile=/opt/najem-watcher/.env
+# nepremicnine.net and bolha.com only answer a real browser, so Chromium must
+# live somewhere the service user can read with ProtectHome=true.
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/najem-watcher/.cache/ms-playwright
+ExecStart=/usr/bin/node /opt/najem-watcher/dist/index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# basic hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/najem-watcher/data
+
+[Install]
+WantedBy=multi-user.target
